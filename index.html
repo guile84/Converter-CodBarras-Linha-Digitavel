@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Código de Barras/Linha Digitável</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding-bottom: 60px; /* Espaço para o rodapé */
+        }
+        #inputArea {
+            margin-bottom: 20px;
+        }
+        #resultTable {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #resultTable th, #resultTable td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #resultTable th {
+            background-color: #f2f2f2;
+        }
+        #message {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        #exportArea {
+            margin-top: 20px;
+            display: none;
+        }
+        footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #343a40;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 14px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Conversor de Código de Barras e Linha Digitável</h1>
+
+    <div id="inputArea">
+        <label for="codigoEntrada">Digite os códigos de barras/linha digitáveis (um por linha):</label><br>
+        <textarea id="codigoEntrada" rows="10" cols="50"></textarea><br>
+        <button onclick="converter()">Converter</button>
+        <div id="message"></div>
+    </div>
+
+    <div id="resultArea">
+        <h2>Resultados:</h2>
+        <div id="exportArea">
+            <label for="exportFormat">Escolha o formato de exportação:</label>
+            <select id="exportFormat">
+                <option value="csv">CSV</option>
+                <option value="txt">TXT</option>
+                <option value="excel">Excel (XLSX)</option>
+            </select>
+            <button onclick="exportar()">Exportar</button>
+        </div>        
+        <br>
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>Original</th>
+                    <th>Conversão</th>
+                    <th>Convertido</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody">
+                <!-- Resultados aparecerão aqui -->
+            </tbody>
+        </table>
+    </div>
+
+
+
+    <footer>
+        Desenvolvido por Guilherme Mannato Coutinho
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="converterBoleto.js"></script>
+    <script>
+        function converter() {
+            const input = document.getElementById('codigoEntrada').value;
+            const linhas = input.split('\n');
+            const resultBody = document.getElementById('resultBody');
+            const message = document.getElementById('message');
+            const exportArea = document.getElementById('exportArea');
+
+            // Limpar resultados anteriores e mensagens
+            resultBody.innerHTML = '';
+            message.innerHTML = '';
+            exportArea.style.display = 'none';
+
+            let allValid = true;
+            let results = [];
+
+            linhas.forEach(function(linha) {
+                const original = linha.trim();
+                if (original) {
+                    if (original.length !== 44 && original.length !== 47) {
+                        allValid = false;
+                        message.innerHTML = "Erro: Todos os códigos devem ter 44 ou 47 dígitos.";
+                        message.className = "error";
+                    } else {
+                        const convertido = convertBL(original);
+                        results.push({ original, convertido });
+
+                        const row = document.createElement('tr');
+                        const cellConversao = document.createElement('td');
+                        const cellOriginal = document.createElement('td');
+                        const cellConvertido = document.createElement('td');
+
+                        cellOriginal.textContent = original;
+                        cellConvertido.textContent = convertido;
+
+                        if (original.length == 44) 
+                        {
+                            cellConversao.textContent = "CB >> LD"
+                        } else {
+                            cellConversao.textContent = "LD >> CB"
+                        }
+
+                        row.appendChild(cellOriginal);
+                        row.appendChild(cellConversao);
+                        row.appendChild(cellConvertido);
+                        resultBody.appendChild(row);
+                    }
+                }
+            });
+
+            if (results.length > 0) {
+                message.innerHTML = "Convertido com sucesso!";
+                message.className = "success";
+                exportArea.style.display = 'block';
+                window.convertedResults = results; // Armazena os resultados para exportação
+            } else {
+                message.innerHTML = "";
+            }
+        }
+
+        function exportar() {
+            const format = document.getElementById('exportFormat').value;
+            const results = window.convertedResults;
+
+            if (format === 'csv') {
+                let content = 'Original,Convertido\n';
+                results.forEach(result => {
+                    content += `"${result.original}","${result.convertido}"\n`; // Adiciona aspas para tratar como texto
+                });
+                downloadFile(content, 'resultado.csv', 'text/csv');
+            } else if (format === 'txt') {
+                let content = '';
+                results.forEach(result => {
+                    content += `Original: ${result.original} - Convertido: ${result.convertido}\n`;
+                });
+                downloadFile(content, 'resultado.txt', 'text/plain');
+            } else if (format === 'excel') {
+                // Inclui cabeçalhos nas colunas
+                const dataWithHeaders = [
+                    ["Original", "Convertido"],
+                    ...results.map(result => [result.original, result.convertido])
+                ];
+
+                const ws = XLSX.utils.aoa_to_sheet(dataWithHeaders);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
+
+                // Formatar colunas como texto
+                ws['!cols'] = [{ wch: 20 }, { wch: 20 }]; // Define a largura das colunas
+                Object.keys(ws).forEach(cell => {
+                    if (ws[cell].t === 's' || cell[0] === '!') return; // Pula células não numéricas e de configuração
+                    ws[cell].z = '@'; // Formato de texto
+                });
+
+                XLSX.writeFile(wb, 'resultado.xlsx');
+            }
+        }
+
+        function downloadFile(content, filename, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+
+</body>
+</html>
