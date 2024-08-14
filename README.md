@@ -17,10 +17,8 @@ Este projeto em JavaScript foi desenvolvido para converter linhas digitáveis de
 - Extraia o conteúdo do ZIP para uma pasta de sua escolha no seu sistema.
 - Após a extração, a estrutura da pasta deve ser semelhante a esta:
 
-  /dir_exportado/
-  
-      ├── converterBoleto.js
-  
+  /dir_exportado/  
+      ├── converterBoleto.js  
       └── index.html
 
 ### Passo 3: Executar a Interface
